@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.mad.myfitnesstrackingapp.ui.theme
 
 import android.app.Activity
@@ -50,9 +52,16 @@ fun FitnessAppTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
             // Updated logic as you requested
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+
+
+
+            // Set the status bar color to match the dark top of your gradient
+            window.statusBarColor = GradientTop.toArgb()
+
+            // which will look good on your new dark status bar
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
         }
     }
 

@@ -10,8 +10,10 @@ val DeepBlue = Color(0xFF023E8A)          // Dark Blue
 val LightCyan = Color(0xFFE0F7FA)         // Very Light
 val TextFieldBackground = Color(0x1AFFFFFF) // Transparent White
 
-val GradientTop = Color(0xFF0077B6)       // Medium Blue (for gradient)
-val GradientBottom = Color(0xFF00B4D8)    // Bright Blue (for gradient)
+
+val GradientTop = Color(0xFF0F2027)
+val GradientMid = Color(0xFF203A43)
+val GradientBottom = Color(0xFF2C5364)
 
 // --- New Dark Theme Colors ---
 // These are defined based on your new palette

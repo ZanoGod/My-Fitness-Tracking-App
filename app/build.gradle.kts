@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+
 }
 
 android {
@@ -51,8 +52,13 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.volley)
-
+//    implementation("androidx.compose.material3:material3:1.4.0")
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.play.services.location)
+    implementation(libs.androidx.room.common.jvm)
+
+    implementation("androidx.compose.material:material-icons-extended")
+
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -61,4 +67,43 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    implementation("androidx.compose.foundation:foundation:1.9.4")
+
+    // Retrofit for networking
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+// Gson converter for Retrofit (to parse JSON)
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+// Kotlin Coroutines (for managing background tasks like network calls)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+
+// ViewModel KTX (for using coroutines in ViewModels)
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
+// Lifecycle Runtime KTX (for collecting state in Composables)
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
+
+    //livedata
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-service:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
+
+    //hilt
+    implementation("com.google.dagger:hilt-android:2.54")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+
+
+    implementation("androidx.security:security-crypto:1.1.0")
+    implementation("com.android.volley:volley:1.2.1")
+
+// Google Maps + Compose (Kotlin 2.0 compatible)
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.maps.android:maps-compose:2.11.4")
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
+
+
 }
