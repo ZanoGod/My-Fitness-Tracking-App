@@ -1,13 +1,14 @@
 package com.mad.myfitnesstrackingapp.screens
 
-
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -32,13 +33,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationServices
-import com.mad.myfitnesstrackingapp.db.Workout_Db_connection
+import com.mad.myfitnesstrackingapp.db.WorkoutDbViewModel
 import com.mad.myfitnesstrackingapp.screens.ui.ModernTextField
 import com.mad.myfitnesstrackingapp.ui.theme.AccentBlue
 import com.mad.myfitnesstrackingapp.ui.theme.GradientBottom
 import com.mad.myfitnesstrackingapp.ui.theme.GradientTop
 import com.mad.myfitnesstrackingapp.ui.theme.PrimaryBlue
 import com.mad.myfitnesstrackingapp.ui.theme.TextFieldBackground
+import com.mad.myfitnesstrackingapp.notifications.NotificationHelper
+import com.mad.myfitnesstrackingapp.notifications.NotificationChannels
 
 // List of available activity types
 val allActivityTypes = listOf(
@@ -48,18 +51,17 @@ val allActivityTypes = listOf(
     "Weightlifting",
 )
 
-
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class) // Added for ExposedDropdownMenuBox
 @Composable
-fun AddWorkoutScreen(
-    addWorkout: Workout_Db_connection,
+fun ManualAddWorkoutScreen(
+    addWorkout: WorkoutDbViewModel,
     onWorkoutSaved: () -> Boolean
 ) {
 
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     // --- UPDATED STATE ---
-    // Changed from multi-select set to single-select string
     var selectedActivity by remember { mutableStateOf("") }
     var isActivityDropdownExpanded by remember { mutableStateOf(false) }
     // --- END OF UPDATE ---
@@ -71,7 +73,7 @@ fun AddWorkoutScreen(
     var reps by remember { mutableStateOf("") }
 
     // State for location
-    var latitude by remember { mutableStateOf<Double?>( 0.0) }
+    var latitude by remember { mutableStateOf<Double?>(0.0) }
     var longitude by remember { mutableStateOf<Double?>(0.0) }
     var locationText by remember { mutableStateOf("No location yet") }
 
@@ -109,7 +111,7 @@ fun AddWorkoutScreen(
                 )
             ).clickable(
                 indication = null, interactionSource = remember { MutableInteractionSource() }
-            ){
+            ) {
                 focusManager.clearFocus()
             },
         contentAlignment = Alignment.TopCenter
@@ -145,54 +147,41 @@ fun AddWorkoutScreen(
                 onExpandedChange = { isActivityDropdownExpanded = it },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // --- MODIFIED THIS BLOCK ---
-                // Using OutlinedTextField directly to support readOnly, trailingIcon, and modifier
-                // We apply the same styles from your ModernTextField implementation
                 OutlinedTextField(
                     value = selectedActivity,
                     onValueChange = {}, // Not editable directly
-                    readOnly = true, // This param is supported by OutlinedTextField
-                    // Updated placeholder color to match ModernTextField
+                    readOnly = true,
                     placeholder = { Text("Select an Activity", color = Color.White.copy(alpha = 0.7f)) },
-                    trailingIcon = { // This param is supported
+                    trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = isActivityDropdownExpanded)
                     },
-                    shape = RoundedCornerShape(16.dp), // Style from ModernTextField
-                    // --- THIS IS THE FIX ---
-                    // Copied colors directly from your ModernTextField implementation
-                    // And added trailingIcon colors
+                    shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.White,
                         unfocusedBorderColor = Color.White.copy(alpha = 0.6f),
                         focusedContainerColor = TextFieldBackground,
                         unfocusedContainerColor = TextFieldBackground,
                         cursorColor = PrimaryBlue,
-                        focusedTextColor = Color.White, // Fixes black text
-                        unfocusedTextColor = Color.White, // Fixes black text
-
-                        // Set placeholder and icon colors
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
                         focusedPlaceholderColor = Color.White.copy(alpha = 0.7f),
                         unfocusedPlaceholderColor = Color.White.copy(alpha = 0.7f),
                         focusedTrailingIconColor = Color.White.copy(alpha = 0.7f),
                         unfocusedTrailingIconColor = Color.White.copy(alpha = 0.7f),
-
-                        // Disabled colors from your original ModernTextField
                         disabledBorderColor = Color.White.copy(alpha = 0.3f),
                         disabledContainerColor = TextFieldBackground.copy(alpha = 0.5f),
                         disabledTextColor = Color.White.copy(alpha = 0.7f),
                         disabledPlaceholderColor = Color.White.copy(alpha = 0.5f)
                     ),
-                    // --- END OF FIX ---
-                    singleLine = true, // Added from ModernTextField
+                    singleLine = true,
                     modifier = Modifier
                         .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                         .fillMaxWidth()
                 )
-                // --- END OF MODIFICATION ---
+
                 ExposedDropdownMenu(
                     expanded = isActivityDropdownExpanded,
                     onDismissRequest = { isActivityDropdownExpanded = false },
-                    // Set a background color for the dropdown menu
                     modifier = Modifier
                         .background(
                             color = GradientBottom
@@ -201,19 +190,20 @@ fun AddWorkoutScreen(
                 ) {
                     allActivityTypes.forEach { activity ->
                         DropdownMenuItem(
-                            text = { Text(activity, color = Color.White, textAlign = TextAlign.Center ) }, // Text color for items
+                            text = { Text(activity, color = Color.White, textAlign = TextAlign.Center) },
                             onClick = {
                                 selectedActivity = activity
                                 isActivityDropdownExpanded = false
                             },
-                            modifier = Modifier.fillMaxWidth().align(Alignment.CenterHorizontally)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.CenterHorizontally)
                         )
                     }
                 }
             }
             Spacer(modifier = Modifier.height(20.dp))
             // --- END OF REPLACEMENT ---
-
 
             // Other Form Fields
             ModernTextField(
@@ -234,7 +224,7 @@ fun AddWorkoutScreen(
                 value = weight,
                 onValueChange = { weight = it },
                 placeholder = "Weight (kg) - Optional",
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number,imeAction = ImeAction.Next )
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
             )
             Spacer(modifier = Modifier.height(20.dp))
             ModernTextField(
@@ -262,7 +252,7 @@ fun AddWorkoutScreen(
                             Manifest.permission.ACCESS_FINE_LOCATION
                         ) == PackageManager.PERMISSION_GRANTED
                     ) {
-                        fetchLocation(context) { lat, lon->
+                        fetchLocation(context) { lat, lon ->
                             latitude = lat
                             longitude = lon
                             locationText = "Location captured!"
@@ -289,17 +279,55 @@ fun AddWorkoutScreen(
                     fontWeight = FontWeight.SemiBold
                 )
             }
-            Text(locationText , color = Color.White.copy(alpha = 0.8f))
+            Text(locationText, color = Color.White.copy(alpha = 0.8f))
             Text("$latitude & $longitude", color = Color.White.copy(alpha = 0.8f))
 
             Spacer(modifier = Modifier.height(20.dp))
 
             // Save Button
             Button(
-                // --- UPDATED ONCLICK LOGIC ---
                 onClick = {
-                    // No need to join string, just use selectedActivity
+                    // Validate required fields
                     if (selectedActivity.isNotBlank() && duration.isNotBlank()) {
+                        // Build an onSuccess wrapper that calls your original callback
+                        // and posts a notification when it reports success.
+                        val onSuccessWrapper: () -> Boolean = {
+                            val saved = onWorkoutSaved()
+                            if (saved) {
+                                // Post a notification (respecting Android 13+ runtime permission)
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    if (ContextCompat.checkSelfPermission(
+                                            context,
+                                            Manifest.permission.POST_NOTIFICATIONS
+                                        ) == PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        NotificationHelper.postNotification(
+                                            context = context,
+                                            channelId = NotificationChannels.CHANNEL_REMINDERS,
+                                            title = "Workout saved",
+                                            message = "$selectedActivity for $duration minutes logged!"
+                                        )
+                                    } else {
+                                        Toast.makeText(
+                                            context,
+                                            "Notification permission not granted",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                } else {
+                                    // pre-Android 13: post without runtime permission
+                                    NotificationHelper.postNotification(
+                                        context = context,
+                                        channelId = NotificationChannels.CHANNEL_REMINDERS,
+                                        title = "Workout saved",
+                                        message = "$selectedActivity for $duration minutes logged!"
+                                    )
+                                }
+                            }
+                            saved
+                        }
+
+                        // Call addWorkout with the wrapped callback
                         addWorkout.addWorkout(
                             type = selectedActivity,
                             duration = duration,
@@ -307,7 +335,7 @@ fun AddWorkoutScreen(
                             weight = weight.ifBlank { null },
                             sets = sets.ifBlank { null },
                             reps = reps.ifBlank { null },
-                            onSuccess = onWorkoutSaved
+                            onSuccess = onSuccessWrapper
                         )
                     } else {
                         Toast.makeText(
@@ -317,7 +345,6 @@ fun AddWorkoutScreen(
                         ).show()
                     }
                 },
-                // --- END OF UPDATE ---
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                 shape = RoundedCornerShape(40.dp),
                 modifier = Modifier

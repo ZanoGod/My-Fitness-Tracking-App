@@ -29,15 +29,13 @@ import androidx.navigation.NavController
 import com.mad.myfitnesstrackingapp.navigation.NavRoute
 import com.mad.myfitnesstrackingapp.ui.theme.*
 import com.mad.myfitnesstrackingapp.R
-// --- FIX: Import the correct ViewModel from the 'db' package ---
-import com.mad.myfitnesstrackingapp.db.Workout_Db_connection
+import com.mad.myfitnesstrackingapp.db.WorkoutDbViewModel
 import com.mad.myfitnesstrackingapp.screens.ui.Goal
 import com.mad.myfitnesstrackingapp.screens.ui.GoalProgressCard
 import com.mad.myfitnesstrackingapp.screens.ui.QuickAction
 import com.mad.myfitnesstrackingapp.screens.ui.QuickActionsGrid
 import com.mad.myfitnesstrackingapp.screens.ui.RecentWorkoutItem
 import com.mad.myfitnesstrackingapp.screens.ui.SummaryCard
-
 
 
 // --- Dashboard Screen Composable ---
@@ -47,7 +45,7 @@ import com.mad.myfitnesstrackingapp.screens.ui.SummaryCard
 fun DashboardScreen(
     navController: NavController,
     // 1. Inject the correct WorkoutViewModel (from 'db' package)
-    workoutViewModel: Workout_Db_connection = viewModel(),
+    workoutViewModel: WorkoutDbViewModel = viewModel(),
 ) {
     // 2. Collect state from the ViewModel
     val userName by workoutViewModel.username.collectAsState()
@@ -210,7 +208,7 @@ fun DashboardScreen(
                 }
             }
 
-            // --- Scrollable Recent Workouts List ---
+            // --- Scrollable Recent Workouts List  With RecyclerView---
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()

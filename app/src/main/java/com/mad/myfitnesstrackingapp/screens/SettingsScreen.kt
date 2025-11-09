@@ -1,7 +1,15 @@
 package com.mad.myfitnesstrackingapp.screens
 
-import android.R.attr.onClick
+import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,49 +26,70 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Color.Companion.LightGray
-import androidx.compose.ui.graphics.Color.Companion.White
-import androidx.compose.ui.graphics.painter.Painter // Import Painter
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource // Import painterResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.mad.myfitnesstrackingapp.R // Import R
+import com.mad.myfitnesstrackingapp.R
+import com.mad.myfitnesstrackingapp.notifications.NotificationChannels
+import com.mad.myfitnesstrackingapp.notifications.NotificationHelper
+import com.mad.myfitnesstrackingapp.notifications.NotificationPrefs
 import com.mad.myfitnesstrackingapp.ui.theme.GradientBottom
 import com.mad.myfitnesstrackingapp.ui.theme.GradientMid
 import com.mad.myfitnesstrackingapp.ui.theme.GradientTop
 import com.mad.myfitnesstrackingapp.ui.theme.LightCyan
 import com.mad.myfitnesstrackingapp.ui.theme.PrimaryBlue
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(navController: NavController) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Flow from DataStore (NotificationPrefs.notificationsEnabledFlow)
+    val notificationsEnabledFlow = NotificationPrefs.notificationsEnabledFlow(context)
+    val notificationsOn by notificationsEnabledFlow.collectAsState(initial = true)
+
+    // Permission launcher for Android 13+ POST_NOTIFICATIONS
+    val shouldRequestPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { granted ->
+            if (granted) {
+                // Optionally show a toast when user grants
+                Toast.makeText(context, "Notification permission granted", Toast.LENGTH_SHORT).show()
+            } else {
+                // If denied, user might need to enable from settings
+                Toast.makeText(context, "Notification permission denied", Toast.LENGTH_SHORT).show()
+            }
+        }
+    )
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings", fontWeight = FontWeight.Bold, color = White) },
+                title = { Text("Settings", fontWeight = FontWeight.Bold, color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = White
+                            tint = Color.White
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = GradientTop // Match the gradient top
+                    containerColor = GradientTop
                 )
             )
         }
     ) { innerPadding ->
         Box(
-
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
@@ -71,16 +100,16 @@ fun SettingsScreen(navController: NavController) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState()) // Make it scrollable
+                    .verticalScroll(rememberScrollState())
             ) {
                 // --- Account Section ---
                 SettingsGroupHeader("Account")
                 SettingsClickableItem(
-                    // Use the new R.drawable resource
                     icon = painterResource(id = R.drawable.person_pin_24px),
                     title = "Edit Profile",
                     subtitle = "Change your name, email, etc."
                 ) { /* TODO: Navigate to Edit Profile */ }
+
                 SettingsClickableItem(
                     icon = painterResource(id = R.drawable.settings_24px),
                     title = "Login & Security",
@@ -97,15 +126,41 @@ fun SettingsScreen(navController: NavController) {
                     subtitle = "Metric (kg, km) / Imperial (lbs, mi)"
                 ) { /* TODO: Show units dialog */ }
 
-                // Mock state for toggles
-                var notificationsOn by remember { mutableStateOf(true) }
+                // Push Notifications toggle: persistent + permission + test notification
                 SettingsToggleItem(
-                    icon = painterResource(id=R.drawable.edit_notifications),
+                    icon = painterResource(id = R.drawable.edit_notifications),
                     title = "Push Notifications",
                     subtitle = "Workout reminders, goal updates",
                     isChecked = notificationsOn
-                ) { notificationsOn = it }
+                ) { newValue ->
+                    scope.launch {
+                        // Save new preference
+                        NotificationPrefs.setNotificationsEnabled(context, newValue)
 
+                        if (newValue) {
+                            // If Android 13+, request runtime permission
+                            if (shouldRequestPermission) {
+                                val granted = checkNotificationPermission(context)
+                                if (!granted) {
+                                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                            }
+
+                            // Post a test notification (best-effort)
+                            NotificationHelper.postNotification(
+                                context = context,
+                                channelId = NotificationChannels.CHANNEL_REMINDERS,
+                                title = "Notifications enabled",
+                                message = "You'll now receive workout reminders."
+                            )
+                            Toast.makeText(context, "Notifications enabled", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Notifications disabled", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+
+                // Dark mode toggle (example)
                 var darkModeOn by remember { mutableStateOf(true) }
                 SettingsToggleItem(
                     icon = painterResource(id = R.drawable.dark_mode_24px),
@@ -122,36 +177,42 @@ fun SettingsScreen(navController: NavController) {
                     icon = painterResource(id = R.drawable.privacy_tip_24px),
                     title = "Privacy Policy",
                     subtitle = null
-                ) { /* TODO: Open Privacy Policy URL */ }
+                ) {
+                    // Example: open privacy policy URL
+                    openUrl(context, "https://example.com/privacy")
+                }
                 SettingsClickableItem(
                     icon = painterResource(id = R.drawable.description_24px),
                     title = "Terms of Service",
                     subtitle = null
-                ) { /* TODO: Open Terms URL */ }
+                ) {
+                    openUrl(context, "https://example.com/terms")
+                }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // --- Delete Account Button ---
+                // Delete Account (example)
                 TextButton(
-
                     onClick = {
-                        Toast.makeText(context, " Delete Account!!!  ", Toast.LENGTH_SHORT)
+                        Toast.makeText(context, "Delete Account!!!", Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
-                        .background(color = LightGray.copy(0.7f), shape = CircleShape)
-
+                        .background(color = LightCyan.copy(alpha = 0.1f), shape = CircleShape)
                 ) {
-                    Text("Delete Account", color = Color.Red.copy(alpha = 0.7f), fontSize = 18.sp)
+                    Text("Delete Account", color = Color.Red.copy(alpha = 0.9f), fontSize = 18.sp)
                 }
+
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
 }
 
-// --- NEW HELPER COMPOSABLES ---
+/* -------------------------
+   Helper composables
+   ------------------------- */
 
 @Composable
 private fun SettingsGroupHeader(title: String) {
@@ -176,7 +237,6 @@ private fun SettingsClickableItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable {
-                // For now, just show a Toast as a placeholder
                 Toast
                     .makeText(context, "$title Clicked (Not Implemented)", Toast.LENGTH_SHORT)
                     .show()
@@ -186,12 +246,12 @@ private fun SettingsClickableItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            painter = icon, // Changed from imageVector to painter
+            painter = icon,
             contentDescription = title,
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(White)
+                .background(Color.White)
                 .padding(8.dp)
         )
         Spacer(modifier = Modifier.width(16.dp))
@@ -205,7 +265,7 @@ private fun SettingsClickableItem(
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = "Navigate",
-            tint = White.copy(alpha = 0.7f),
+            tint = Color.White.copy(alpha = 0.7f),
             modifier = Modifier.size(24.dp)
         )
     }
@@ -213,7 +273,7 @@ private fun SettingsClickableItem(
 
 @Composable
 private fun SettingsToggleItem(
-    icon: Painter, // Changed from ImageVector to Painter
+    icon: Painter,
     title: String,
     subtitle: String,
     isChecked: Boolean,
@@ -227,9 +287,8 @@ private fun SettingsToggleItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            painter = icon, // Changed from imageVector to painter
+            painter = icon,
             contentDescription = title,
-
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
@@ -255,3 +314,50 @@ private fun SettingsToggleItem(
     }
 }
 
+/* -------------------------
+   Utility functions
+   ------------------------- */
+
+private fun checkNotificationPermission(context: Context): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    } else {
+        true
+    }
+}
+
+private fun openUrl(context: Context, url: String) {
+    try {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        context.startActivity(intent)
+    } catch (e: ActivityNotFoundException) {
+        Toast.makeText(context, "Unable to open link", Toast.LENGTH_SHORT).show()
+    }
+}
+
+@Suppress("UNUSED_PARAMETER")
+private fun openAppNotificationSettings(context: Context) {
+    // Useful if you want to direct the user to app notification settings
+    try {
+        val intent = Intent().apply {
+            action = Settings.ACTION_APP_NOTIFICATION_SETTINGS
+            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+        }
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        // Fallback: open app details
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:${context.packageName}")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(context, "Cannot open app settings", Toast.LENGTH_SHORT).show()
+        }
+    }
+}

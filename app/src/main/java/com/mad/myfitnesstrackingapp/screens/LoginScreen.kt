@@ -55,7 +55,6 @@ fun LoginScreen(
     val statusBarTopPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     // React to login success
-    // React to login success
     LaunchedEffect(loginSuccess) {
         if (loginSuccess) {
             // Show the toast and set a clear small autoDismiss duration

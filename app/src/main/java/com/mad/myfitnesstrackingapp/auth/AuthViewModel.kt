@@ -9,24 +9,17 @@ import androidx.lifecycle.viewModelScope
 import com.android.volley.DefaultRetryPolicy
 import com.android.volley.Request
 import com.android.volley.toolbox.StringRequest
-import com.android.volley.toolbox.Volley
+import com.mad.myfitnesstrackingapp.networks.ApiConfig
 import com.mad.myfitnesstrackingapp.util.SecurePrefs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
-/**
- * AuthViewModel
- * - stores JWT token (if server returns it) into EncryptedSharedPreferences via SecurePrefs
- * - exposes loginSuccess / registerSuccess / isLoading
- * - exposes errorState as Pair(statusCode:Int, message:String) for UI to respond to
- */
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val SERVER_IP = "192.168.0.75"
-    private val LOGIN_URL = "http://$SERVER_IP/fitness_api/login.php"
-    private val REGISTER_URL = "http://$SERVER_IP/fitness_api/register.php"
+    private val LOGIN_URL = ApiConfig.LOGIN_URL
+    private val REGISTER_URL = ApiConfig.REGISTER_URL
 
     private val _loginSuccess = MutableStateFlow<Boolean>(false)
     val loginSuccess = _loginSuccess.asStateFlow()
@@ -37,21 +30,59 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLoading = MutableStateFlow<Boolean>(false)
     val isLoading = _isLoading.asStateFlow()
 
-    // errorState holds Pair(statusCode, message). statusCode = -1 when not available.
+
     private val _errorState = MutableStateFlow<Pair<Int, String>?>(null)
     val errorState = _errorState.asStateFlow()
 
-    private val queue = Volley.newRequestQueue(application.applicationContext)
 
-    private fun storeAuthToken(token: String?, userId: Int, username: String) {
+    private val _email = MutableStateFlow<String?>(null)
+    val email = _email.asStateFlow()
+
+    private val _createdAt = MutableStateFlow<String?>(null)
+    val createdAt = _createdAt.asStateFlow()
+
+
+    private val _username = MutableStateFlow<String>("")
+    val username = _username.asStateFlow()
+
+    private val queue = VolleySingleton.getQueue(application.applicationContext)
+    private val REQUEST_TAG = "AuthRequests"
+
+    init {
+
+        val prefs = application.getSharedPreferences("FitnessAppPrefs", Context.MODE_PRIVATE)
+        _username.value = prefs.getString("username", "") ?: ""
+        _email.value = prefs.getString("email", null)
+        _createdAt.value = prefs.getString("created_at", null)
+    }
+
+    private fun storeAuthToken(token: String?, userId: Int, username: String, emailStr: String?, createdAtStr: String?) {
         try {
-            val prefs = SecurePrefs.getEncryptedSharedPreferences(getApplication())
-            with(prefs.edit()) {
+            // Store sensitive token in EncryptedSharedPreferences
+            val encPrefs = SecurePrefs.getEncryptedSharedPreferences(getApplication())
+            with(encPrefs.edit()) {
                 putString("auth_token", token)
                 putInt("user_id", userId)
                 putString("username", username)
+                putString("email", emailStr)
+                putString("created_at", createdAtStr)
                 apply()
             }
+
+            // Also persist lightweight values in regular SharedPreferences for other parts of app
+            val plainPrefs = getApplication<Application>().getSharedPreferences("FitnessAppPrefs", Context.MODE_PRIVATE)
+            with(plainPrefs.edit()) {
+                putInt("user_id", userId)
+                putString("username", username)
+                putString("email", emailStr)
+                putString("created_at", createdAtStr)
+                apply()
+            }
+
+            // Update flows (UI)
+            _username.value = username
+            _email.value = emailStr
+            _createdAt.value = createdAtStr
         } catch (e: Exception) {
             Log.e("AuthViewModel", "Failed to store token: ${e.message}")
         }
@@ -71,8 +102,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             with(sharedPreferences.edit()) {
                 putInt("user_id", -1)
                 putString("username", "User")
+                putString("email", "user@local")
+                putString("created_at", "2024-01-01 00:00:00")
                 apply()
             }
+            // update flows
+            _username.value = "User"
+            _email.value = "user@local"
+            _createdAt.value = "2024-01-01 00:00:00"
+
             Toast.makeText(getApplication(), "Offline Login Successful!", Toast.LENGTH_SHORT).show()
             viewModelScope.launch {
                 _loginSuccess.emit(true)
@@ -93,13 +131,14 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         val userObj = jsonResponse.getJSONObject("user")
                         val userId = userObj.getInt("user_id")
                         val username = userObj.getString("username")
-                        storeAuthToken(token, userId, username)
+                        val emailResp = userObj.optString("email", null)
+                        val createdAtResp = userObj.optString("created_at", null)
+                        storeAuthToken(token, userId, username, emailResp, createdAtResp)
 
                         Toast.makeText(getApplication(), "Login Successful!", Toast.LENGTH_SHORT).show()
                         viewModelScope.launch { _loginSuccess.emit(true) }
                     } else {
                         val message = jsonResponse.optString("message", "Login failed")
-                        // present validation/server message with no http code (-1)
                         viewModelScope.launch { _errorState.emit(Pair(-1, message)) }
                     }
                 } catch (e: Exception) {
@@ -141,6 +180,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             DefaultRetryPolicy.DEFAULT_BACKOFF_MULT
         )
 
+        stringRequest.tag = REQUEST_TAG
         queue.add(stringRequest)
     }
 
@@ -202,6 +242,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             DefaultRetryPolicy.DEFAULT_BACKOFF_MULT
         )
 
+        stringRequest.tag = REQUEST_TAG
         queue.add(stringRequest)
     }
 
@@ -211,10 +252,46 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             _isLoading.emit(false)
         }
     }
+
     fun resetRegisterFlow() {
         viewModelScope.launch {
             _registerSuccess.emit(false)
             _isLoading.emit(false)
         }
+    }
+
+    fun logout() {
+        // clear encrypted + plain prefs
+        try {
+            val enc = SecurePrefs.getEncryptedSharedPreferences(getApplication())
+            with(enc.edit()) {
+                remove("auth_token")
+                remove("user_id")
+                remove("username")
+                remove("email")
+                remove("created_at")
+                apply()
+            }
+        } catch (_: Exception) { }
+
+        val plain = getApplication<Application>().getSharedPreferences("FitnessAppPrefs", Context.MODE_PRIVATE)
+        with(plain.edit()) {
+            clear()
+            apply()
+        }
+
+        // reset flows
+        _username.value = ""
+        _email.value = null
+        _createdAt.value = null
+        viewModelScope.launch {
+            _loginSuccess.emit(false)
+            _isLoading.emit(false)
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        queue.cancelAll(REQUEST_TAG)
     }
 }

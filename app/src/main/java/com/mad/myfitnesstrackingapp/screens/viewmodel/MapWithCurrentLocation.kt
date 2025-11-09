@@ -1,10 +1,10 @@
-package com.mad.myfitnesstrackingapp.networks
-
+package com.mad.myfitnesstrackingapp.screens.viewmodel
 
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
+import android.content.pm.PackageManager
 import android.location.Location
 import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -13,18 +13,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
 
-@SuppressLint("MissingPermission") // we handle permission at runtime
+@SuppressLint("MissingPermission")
 @Composable
 fun MapWithCurrentLocation(
     modifier: Modifier = Modifier.fillMaxSize(),
+    cameraPositionState: CameraPositionState,
+    lastLocationState: MutableState<LatLng?>,
+    pathPointsState: MutableState<List<LatLng>>,
     defaultCenter: LatLng = LatLng(37.4219999, -122.0840575),
     zoom: Float = 16f,
-    updateIntervalMs: Long = 2000L
+    updateIntervalMs: Long = 2000L,
+    autoFollow: Boolean = false           // <-- new parameter (auto-move only when true)
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -34,7 +39,6 @@ fun MapWithCurrentLocation(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { /* handled reactively below */ }
 
-    // Track whether we have location permission
     var hasLocationPermission by remember { mutableStateOf(false) }
 
     // Initial permission check
@@ -53,8 +57,6 @@ fun MapWithCurrentLocation(
     }
 
     val fusedClient = remember { LocationServices.getFusedLocationProviderClient(context) }
-    val cameraPositionState = rememberCameraPositionState()
-    var pathPoints by remember { mutableStateOf<List<LatLng>>(emptyList()) }
 
     val locationRequest = remember {
         LocationRequest.Builder(
@@ -69,20 +71,33 @@ fun MapWithCurrentLocation(
                 val locations = result.locations
                 if (locations.isNotEmpty()) {
                     val newPoints = locations.map { LatLng(it.latitude, it.longitude) }
-                    pathPoints = pathPoints + newPoints
+                    pathPointsState.value = pathPointsState.value + newPoints
+                    val last = newPoints.last()
+                    lastLocationState.value = last
+
+                    // ✅ Move camera only when autoFollow is true
+                    if (autoFollow) {
+                        cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(last, zoom))
+                    }
                 }
             }
         }
     }
 
-    // Start/stop location updates
     DisposableEffect(hasLocationPermission) {
         if (hasLocationPermission) {
             fusedClient.lastLocation.addOnSuccessListener { last: Location? ->
                 val target = last?.let { LatLng(it.latitude, it.longitude) } ?: defaultCenter
-                cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(target, zoom))
-                if (last != null) pathPoints = listOf(target)
+                if (autoFollow) {
+                    cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(target, zoom))
+                }
+                last?.let {
+                    val alsoPoint = LatLng(it.latitude, it.longitude)
+                    pathPointsState.value = pathPointsState.value + listOf(alsoPoint)
+                    lastLocationState.value = alsoPoint
+                }
             }
+
             fusedClient.requestLocationUpdates(
                 locationRequest,
                 locationCallback,
@@ -94,20 +109,17 @@ fun MapWithCurrentLocation(
         }
     }
 
-    // The Map
+    // Map UI
     GoogleMap(
         modifier = modifier,
         cameraPositionState = cameraPositionState,
         properties = MapProperties(isMyLocationEnabled = hasLocationPermission),
         uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = false)
     ) {
-        // Polyline for path
-        if (pathPoints.size >= 2) {
-            Polyline(points = pathPoints)
+        if (pathPointsState.value.size >= 2) {
+            Polyline(points = pathPointsState.value)
         }
-
-        // ✅ Use MarkerState instead of position param
-        pathPoints.lastOrNull()?.let { last ->
+        lastLocationState.value?.let { last ->
             Marker(
                 state = rememberMarkerState(position = last),
                 title = "Current location"
@@ -116,9 +128,5 @@ fun MapWithCurrentLocation(
     }
 }
 
-/** Helper to check permissions safely */
 private fun Context.checkSelfPermissionCompat(permission: String): Boolean =
-    androidx.core.content.ContextCompat.checkSelfPermission(
-        this,
-        permission
-    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED

@@ -36,9 +36,6 @@ import com.mad.myfitnesstrackingapp.db.WorkoutPreview
 import com.mad.myfitnesstrackingapp.ui.theme.SecondaryCyan
 import java.time.format.DateTimeFormatter
 
-// --- Small building block composables ---
-// These were moved from DashboardScreen.kt
-
 
 @Composable
 internal fun SummaryCard(
@@ -173,8 +170,7 @@ internal fun QuickActionsGrid(
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-// --- FIX 1: Change the type to match the ViewModel ---
-// The ViewModel provides 'db.WorkoutPreview', so this composable should expect that type.
+
 internal fun RecentWorkoutItem(workout: WorkoutPreview, onClick: () -> Unit) {
     val formatter = DateTimeFormatter.ofPattern("MMM dd • HH:mm")
     Card(

@@ -9,14 +9,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.mad.myfitnesstrackingapp.db.WorkoutDbViewModel
 
-import com.mad.myfitnesstrackingapp.db.Workout_Db_connection
-
-import com.mad.myfitnesstrackingapp.screens.AddWorkoutScreen
 import com.mad.myfitnesstrackingapp.screens.DashboardScreen
 import com.mad.myfitnesstrackingapp.screens.GoalsScreen
 import com.mad.myfitnesstrackingapp.screens.HistoryScreen
 import com.mad.myfitnesstrackingapp.screens.LoginScreen
+import com.mad.myfitnesstrackingapp.screens.ManualAddWorkoutScreen
 import com.mad.myfitnesstrackingapp.screens.ProfileScreen
 import com.mad.myfitnesstrackingapp.screens.RegisterScreen
 import com.mad.myfitnesstrackingapp.screens.SettingsScreen
@@ -34,7 +33,7 @@ fun Navigation(modifier: Modifier = Modifier) {
 
     NavHost(
         navController = navController,
-        startDestination = NavRoute.WORKOUTS_LIST,
+        startDestination = NavRoute.LOGIN,
         modifier = modifier
     ) {
 
@@ -49,9 +48,9 @@ fun Navigation(modifier: Modifier = Modifier) {
 
         // Manual Add Workout
         composable(NavRoute.WORKOUT) {
-            val workoutViewModel: Workout_Db_connection = viewModel()
+            val workoutViewModel: WorkoutDbViewModel = viewModel()
             val onSaveAction = { navController.popBackStack() }
-            AddWorkoutScreen(
+            ManualAddWorkoutScreen(
                 addWorkout = workoutViewModel,
                 onWorkoutSaved = onSaveAction
             )
@@ -76,7 +75,7 @@ fun Navigation(modifier: Modifier = Modifier) {
 
         // Profile (passes VM)
         composable(NavRoute.PROFILE) {
-            val workoutViewModel: Workout_Db_connection = viewModel()
+            val workoutViewModel:  WorkoutDbViewModel = viewModel()
             ProfileScreen(navController, workoutViewModel)
         }
 

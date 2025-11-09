@@ -24,9 +24,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.mad.myfitnesstrackingapp.notifications.NotificationChannels
+import com.mad.myfitnesstrackingapp.notifications.NotificationHelper
 import com.mad.myfitnesstrackingapp.screens.ui.Goal
 import com.mad.myfitnesstrackingapp.screens.ui.GoalProgressCard
 import com.mad.myfitnesstrackingapp.ui.theme.GradientBottom
@@ -38,7 +41,7 @@ import com.mad.myfitnesstrackingapp.ui.theme.PrimaryBlue
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalsScreen(navController: NavController) {
-
+val context = LocalContext.current
     // Create demo data for this screen
     val demoGoals = listOf(
         Goal(1, "Run 20 km this week", 60),
@@ -67,7 +70,11 @@ fun GoalsScreen(navController: NavController) {
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { /* TODO: Show Add Goal Dialog */ },
+                onClick = {
+                    NotificationHelper.postNotification(
+                        context, NotificationChannels.CHANNEL_REMINDERS, "Set Goals", "Set Goals is Under Maintenance"
+                    )
+                },
                 containerColor = PrimaryBlue
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Goal", tint = Color.White)

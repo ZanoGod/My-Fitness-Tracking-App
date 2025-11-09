@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import com.mad.myfitnesstrackingapp.ui.theme.PrimaryBlue
 import com.mad.myfitnesstrackingapp.ui.theme.TextFieldBackground
 
-// This is your ModernTextField, moved to a common file so both screens can use it
 @Composable
 fun ModernTextField(
     value: String,
